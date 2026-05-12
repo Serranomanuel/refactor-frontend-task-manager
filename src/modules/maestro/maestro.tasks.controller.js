@@ -1,4 +1,4 @@
-import { MaestroTasksView } from './maestro.tasks.js';
+import { MaestroTasksView } from './maestro.task.js';
 
 export const initMaestroTasksModule = (container) => {
   container.innerHTML = MaestroTasksView;
@@ -47,7 +47,7 @@ export const initMaestroTasksModule = (container) => {
 
   renderTasks();
 
-  // --- Lógica del Modal ---
+  // Lógica del Modal
   btnCreateTask.addEventListener('click', () => taskModal.classList.remove('hidden'));
   
   btnCancelTask.addEventListener('click', () => {
