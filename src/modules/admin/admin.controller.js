@@ -1,4 +1,4 @@
-import { AdminView } from './admin.js';
+import { AdminView } from './admin.view.js';
 import { initUsersModule } from './admin.users.controller.js';
 import { initTasksModule } from './admin.tasks.controller.js';
 import { initRolesModule } from './admin.roles.controller.js';

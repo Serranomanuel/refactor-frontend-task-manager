@@ -15,6 +15,15 @@ export const initLogin = (container, navigateToRegister, navigateToAdmin, naviga
       navigateToRegister(); 
     });
   }
+  loginForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const doc = document.querySelector('#documento').value.toLowerCase().trim();
+
+        if (doc === 'admin') navigateToAdmin();
+        else if (doc === 'maestro') navigateToMaestro();
+        else if (doc === 'estudiante') navigateToEstudiante();
+        else alert('Usuario no válido');
+    });
 
   // 4. Lógica de Inicio de Sesión
   if (loginForm) {

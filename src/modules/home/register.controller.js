@@ -1,5 +1,5 @@
-import { RegisterView } from './register.js';
-import { isValidName, isValidDocument, isValidEmail, isValidPassword } from '../utils/validators.js';
+import { RegisterView } from './register.view.js';
+import { isValidName, isValidDocument, isValidEmail, isValidPassword } from '../../utils/validator.js';
 
 export const initRegister = (container, navigateToLogin) => {
   container.innerHTML = RegisterView;
@@ -10,7 +10,8 @@ export const initRegister = (container, navigateToLogin) => {
   if (btnToLogin) {
     btnToLogin.addEventListener('click', (e) => {
       e.preventDefault();
-      navigateToLogin();
+      window.location.hash = '#/login'
+      return
     });
   }
 
