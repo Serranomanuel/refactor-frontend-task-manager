@@ -7,7 +7,7 @@ export const navigateTo = (path) => {
 export const router = () => {
     const app  = document.querySelector('#app');
     const hash = window.location.hash;
-    const path = (hash ? hash.slice(1) : '/login').toLowerCase() || '/login';
+    const path = (hash ? hash.slice(1).split('?')[0] : '/login').toLowerCase() || '/login';
 
     // Buscar coincidencia exacta primero
     let route = routes.find(r => r.path === path);
