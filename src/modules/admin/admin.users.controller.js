@@ -1,49 +1,25 @@
 import { UsersView } from './admin.users.js';
+import { navigateTo } from '../../routes/router.js';
+
+// Con backend: se reemplaza por fetch GET /api/usuarios
+// Campos: name, email, document, role (password_hash solo se envía al crear)
+const mockUsers = [
+    { document: '123456', name: 'Juan Pérez',   email: 'juan@escuela.com',   role: 'Administrador' },
+    { document: '654321', name: 'María Gómez',  email: 'maria@escuela.com',  role: 'Maestro' },
+    { document: '987654', name: 'Carlos López', email: 'carlos@escuela.com', role: 'Estudiante' }
+];
 
 export const initUsersModule = (container) => {
-  // Renderizar la vista
   container.innerHTML = UsersView;
 
-  // Capturar elementos de la tabla y botón
-  const tableBody = document.querySelector('#users-table-body');
-  const btnCreateUser = document.querySelector('#btn-create-user');
-  
-  // Capturar elementos del Modal
-  const userModal = document.querySelector('#user-modal');
+  const tableBody      = document.querySelector('#users-table-body');
+  const btnCreateUser  = document.querySelector('#btn-create-user');
+  const userModal      = document.querySelector('#user-modal');
   const btnCancelModal = document.querySelector('#btn-cancel-modal');
-  const userForm = document.querySelector('#user-form');
-  const modalTitle = document.querySelector('#modal-title');
+  const userForm       = document.querySelector('#user-form');
+  const modalTitle     = document.querySelector('#modal-title');
 
-  // Arreglo simulado de usuarios (ahora le haremos .push)
-  const mockUsers = [
-    { doc: '123456', nombre: 'Juan Pérez', email: 'juan@escuela.com', rol: 'Administrador' },
-    { doc: '654321', nombre: 'María Gómez', email: 'maria@escuela.com', rol: 'Maestro' },
-    { doc: '987654', nombre: 'Carlos López', email: 'carlos@escuela.com', rol: 'Estudiante' }
-  ];
-
-  // Función para inyectar los usuarios en la tabla
-  const renderUsers = (users) => {
-    tableBody.innerHTML = ''; // Limpiamos la tabla antes de reescribirla
-    users.forEach(user => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${user.doc}</td>
-        <td>${user.nombre}</td>
-        <td>${user.email}</td>
-        <td><span class="badge badge-${user.rol.toLowerCase()}">${user.rol}</span></td>
-        <td>
-          <button class="btn-action edit" data-doc="${user.doc}">Editar</button>
-          <button class="btn-action delete" data-doc="${user.doc}">Eliminar</button>
-        </td>
-      `;
-      tableBody.appendChild(tr);
-    });
-  };
-
-  // Carga inicial
-  renderUsers(mockUsers);
-
-  // --- Funciones del Modal ---
+  // Modal helpers 
   const openModal = (title = 'Crear Usuario') => {
     modalTitle.textContent = title;
     userModal.classList.remove('hidden');
@@ -51,38 +27,102 @@ export const initUsersModule = (container) => {
 
   const closeModal = () => {
     userModal.classList.add('hidden');
-    userForm.reset(); // Limpia los campos del formulario
+    userForm.reset();
+    userForm.removeAttribute('data-editing-document');
+    navigateTo('/admin/usuarios');
   };
 
-  // Asignar eventos de apertura y cierre
-  btnCreateUser.addEventListener('click', () => openModal('Crear Usuario'));
+  // Render 
+  const renderUsers = () => {
+    tableBody.innerHTML = '';
+    mockUsers.forEach(user => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${user.document}</td>
+        <td>${user.name}</td>
+        <td>${user.email}</td>
+        <td><span class="badge badge-${user.role.toLowerCase()}">${user.role}</span></td>
+        <td>
+          <button class="btn-action edit btn-edit-user"     data-document="${user.document}">Editar</button>
+          <button class="btn-action delete btn-delete-user" data-document="${user.document}">Eliminar</button>
+        </td>
+      `;
+      tableBody.appendChild(tr);
+    });
+    attachTableEvents();
+  };
+
+  // Eventos de la tabla
+  const attachTableEvents = () => {
+
+    // ELIMINAR
+    // Con backend: DELETE /api/usuarios/:document
+    document.querySelectorAll('.btn-delete-user').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const userDoc = e.target.dataset.document;
+        const index = mockUsers.findIndex(u => u.document === userDoc);
+        if (index !== -1) {
+          mockUsers.splice(index, 1);
+          renderUsers();
+        }
+      });
+    });
+
+    // EDITAR
+    // Con backend: GET /api/usuarios/:document para precargar el formulario
+    document.querySelectorAll('.btn-edit-user').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const userDoc = e.target.dataset.document;
+        const user = mockUsers.find(u => u.document === userDoc);
+
+        navigateTo(`/admin/usuarios/${userDoc}`);
+
+        document.querySelector('#user-doc').value   = user.document;
+        document.querySelector('#user-name').value  = user.name;
+        document.querySelector('#user-email').value = user.email;
+        document.querySelector('#user-role').value  = user.role;
+
+        userForm.setAttribute('data-editing-document', userDoc);
+        openModal(`Editar Usuario — ${user.name}`);
+      });
+    });
+  };
+
+  // Crear 
+  btnCreateUser.addEventListener('click', () => {
+    navigateTo('/admin/usuarios/nuevo');
+    openModal('Crear Usuario');
+  });
+
   btnCancelModal.addEventListener('click', closeModal);
-  
-  // --- Lógica Principal: Guardar Usuario ---
+
+  // Guardar (Crear o Editar)
   userForm.addEventListener('submit', (e) => {
-    e.preventDefault(); // Evita que la página se recargue
-    
-    // 1. Obtener los valores ingresados
-    const docInput = document.querySelector('#user-doc').value;
-    const nameInput = document.querySelector('#user-name').value;
-    const emailInput = document.querySelector('#user-email').value;
-    const roleInput = document.querySelector('#user-role').value;
+    e.preventDefault();
 
-    // 2. Crear el objeto con la estructura de nuestros usuarios
-    const newUser = {
-      doc: docInput,
-      nombre: nameInput,
-      email: emailInput,
-      rol: roleInput
-    };
+    const documentInput = document.querySelector('#user-doc').value;
+    const nameInput     = document.querySelector('#user-name').value;
+    const emailInput    = document.querySelector('#user-email').value;
+    const roleInput     = document.querySelector('#user-role').value;
+    const editingDoc    = userForm.getAttribute('data-editing-document');
 
-    // 3. Añadirlo a nuestra "base de datos" simulada
-    mockUsers.push(newUser);
+    if (editingDoc) {
+      // EDITAR — Con backend: PUT /api/usuarios/:document
+      // Body: { name, email, role }
+      const index = mockUsers.findIndex(u => u.document === editingDoc);
+      if (index !== -1) {
+        mockUsers[index] = { document: documentInput, name: nameInput, email: emailInput, role: roleInput };
+      }
+    } else {
+      // CREAR — Con backend: POST /api/usuarios
+      // Body: { name, email, document, password_hash, role }
+      mockUsers.push({ document: documentInput, name: nameInput, email: emailInput, role: roleInput });
+    }
 
-    // 4. Volver a renderizar la tabla con los datos actualizados
-    renderUsers(mockUsers);
-
-    // 5. Cerrar la ventana emergente
+    renderUsers();
     closeModal();
   });
+
+  // Carga inicial
+  renderUsers();
 };
