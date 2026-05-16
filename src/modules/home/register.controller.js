@@ -1,5 +1,6 @@
 import { RegisterView } from './register.view.js';
 import { isValidName, isValidDocument, isValidEmail, isValidPassword } from '../../utils/validator.js';
+import { UserRepository } from '../../repositories/UserRepository.js';
 
 export const initRegister = (container, navigateToLogin) => {
   container.innerHTML = RegisterView;
@@ -15,12 +16,10 @@ export const initRegister = (container, navigateToLogin) => {
     });
   }
 
-  // --- Función auxiliar para mostrar/ocultar errores ---
   const showError = (inputId, message) => {
     const input = document.querySelector(`#${inputId}`);
     const existingError = input.nextElementSibling;
     
-    // Si ya hay un mensaje de error, lo removemos para actualizarlo
     if (existingError && existingError.classList.contains('error-message')) {
       existingError.remove();
     }
@@ -37,21 +36,18 @@ export const initRegister = (container, navigateToLogin) => {
     document.querySelectorAll('.error-message').forEach(msg => msg.remove());
   };
 
-  // --- Lógica del formulario con validaciones ---
   if (registerForm) {
-    registerForm.addEventListener('submit', (e) => {
+    registerForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      clearErrors(); // Limpiamos errores previos antes de validar
+      clearErrors(); 
 
       let isValid = true;
 
-      // 1. Obtener valores
       const name = document.querySelector('#fullname').value;
       const doc = document.querySelector('#reg-documento').value;
       const email = document.querySelector('#email').value;
       const password = document.querySelector('#reg-password').value;
 
-      // 2. Ejecutar validaciones independientes
       if (!isValidName(name)) {
         showError('fullname', 'Ingrese un nombre válido (solo letras, mín. 3 caracteres).');
         isValid = false;
@@ -72,11 +68,30 @@ export const initRegister = (container, navigateToLogin) => {
         isValid = false;
       }
 
-      // 3. Evaluar resultado final
       if (isValid) {
-        console.log('Validación exitosa. Datos listos para guardar:', { name, doc, email, password });
-        alert('Registro exitoso (Simulado). Ahora puedes iniciar sesión.');
-        navigateToLogin(); // Redirigimos al usuario al login
+        const userData = {
+          name: name,
+          document: doc, 
+          email: email,
+          password: password,
+          role: 'Estudiante' 
+        };
+
+        try {
+          await UserRepository.create(userData);
+          alert('Registro exitoso. Ahora puedes iniciar sesión.');
+          
+          if (navigateToLogin) {
+            navigateToLogin();
+          } else {
+            window.location.hash = '#/login';
+          }
+          
+        } catch (error) {
+          console.error('Error guardando en la base de datos:', error);
+          alert('Hubo un error al conectar con el servidor. Inténtalo más tarde.');
+        }
+
       } else {
         console.log('Errores en el formulario. Corrija los campos marcados en rojo.');
       }
