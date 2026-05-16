@@ -1,138 +1,207 @@
 import { RolesView } from './admin.roles.js';
+import { showToast, showConfirm } from '../../utils/toast.js';
 
-export const initRolesModule = (container) => {
-  container.innerHTML = RolesView;
+const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
 
-  const tableBody = document.querySelector('#roles-table-body');
-  const btnCreateRole = document.querySelector('#btn-create-role');
-  
-  // Elementos de Modales
-  const roleModal = document.querySelector('#role-modal');
-  const roleForm = document.querySelector('#role-form');
-  const btnCancelRole = document.querySelector('#btn-cancel-role');
-  
-  const permissionsModal = document.querySelector('#permissions-modal');
-  const permissionsForm = document.querySelector('#permissions-form');
-  const btnCancelPermissions = document.querySelector('#btn-cancel-permissions');
-  const permissionsList = document.querySelector('#permissions-list');
-  const currentRoleNameSpan = document.querySelector('#current-role-name');
+const getHeaders = () => ({
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${sessionStorage.getItem('accessToken')}`
+});
 
-  // Permisos inmutables del sistema
-  const systemPermissions = [
-    'Crear Tareas', 'Editar Tareas', 'Eliminar Tareas', 'Asignar Tareas',
-    'Crear Usuarios', 'Editar Usuarios', 'Eliminar Usuarios',
-    'Asignar Roles', 'Calificar Trabajos'
-  ];
+export const initRolesModule = async (container) => {
+    container.innerHTML = RolesView;
 
-  // Datos simulados de Roles
-  const mockRoles = [
-    { id: 1, nombre: 'Administrador', permisos: ['Crear Usuarios', 'Eliminar Usuarios', 'Asignar Roles'] },
-    { id: 2, nombre: 'Maestro', permisos: ['Crear Tareas', 'Asignar Tareas', 'Calificar Trabajos'] },
-    { id: 3, nombre: 'Estudiante', permisos: [] }
-  ];
+    const tableBody           = document.querySelector('#roles-table-body');
+    const btnCreateRole       = document.querySelector('#btn-create-role');
+    const roleModal           = document.querySelector('#role-modal');
+    const roleForm            = document.querySelector('#role-form');
+    const btnCancelRole       = document.querySelector('#btn-cancel-role');
+    const permissionsModal    = document.querySelector('#permissions-modal');
+    const permissionsForm     = document.querySelector('#permissions-form');
+    const btnCancelPermissions = document.querySelector('#btn-cancel-permissions');
+    const permissionsList     = document.querySelector('#permissions-list');
+    const currentRoleNameSpan = document.querySelector('#current-role-name');
 
-  let currentEditingRoleId = null;
+    let currentEditingRoleId = null;
 
-  // Renderizar la tabla
-  const renderRoles = () => {
-    tableBody.innerHTML = ''; 
-    mockRoles.forEach(role => {
-      const tr = document.createElement('tr');
-      const permisosHtml = role.permisos.length > 0 
-        ? role.permisos.map(p => `<span class="badge" style="background:#e2e8f0; color:#333; margin: 2px;">${p}</span>`).join('')
-        : '<span style="color:#999; font-size:0.85rem;">Sin permisos especiales</span>';
+    // Cargar y renderizar roles 
+    const loadRoles = async () => {
+        tableBody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:2rem;">Cargando roles...</td></tr>';
+        try {
+            const res  = await fetch(`${API_URL}/api/roles`, { headers: getHeaders() });
+            const json = await res.json();
+            const roles = json.data ?? [];
 
-      tr.innerHTML = `
-        <td><strong>${role.nombre}</strong></td>
-        <td><div style="display: flex; flex-wrap: wrap; gap: 4px;">${permisosHtml}</div></td>
-        <td>
-          <button class="btn-action edit btn-manage-perms" data-id="${role.id}">Permisos</button>
-          <button class="btn-action delete btn-delete-role" data-id="${role.id}">Eliminar</button>
-        </td>
-      `;
-      tableBody.appendChild(tr);
-    });
+            if (roles.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:2rem;">No hay roles registrados.</td></tr>';
+                return;
+            }
 
-    attachTableEvents();
-  };
+            tableBody.innerHTML = '';
+            roles.forEach(role => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${role.name}</strong></td>
+                    <td style="color:#555; font-size:0.9rem;">${role.description ?? '—'}</td>
+                    <td>
+                        <button class="btn-action edit btn-manage-perms" data-id="${role.id}" data-name="${role.name}">Permisos</button>
+                        <button class="btn-action delete btn-delete-role" data-id="${role.id}">Eliminar</button>
+                    </td>
+                `;
+                tableBody.appendChild(tr);
+            });
 
-  // Eventos para botones dentro de la tabla generada
-  const attachTableEvents = () => {
-    document.querySelectorAll('.btn-manage-perms').forEach(btn => {
-      btn.addEventListener('click', (e) => openPermissionsModal(Number(e.target.dataset.id)));
-    });
-    
-    document.querySelectorAll('.btn-delete-role').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const id = Number(e.target.dataset.id);
-        const index = mockRoles.findIndex(r => r.id === id);
-        if(index !== -1) {
-          mockRoles.splice(index, 1);
-          renderRoles();
+            attachTableEvents();
+        } catch (error) {
+            console.error('Error cargando roles:', error);
+            tableBody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:red; padding:2rem;">Error al conectar con el servidor.</td></tr>';
         }
-      });
-    });
-  };
-
-  renderRoles();
-
-  // --- Lógica Modal Crear Rol ---
-  btnCreateRole.addEventListener('click', () => roleModal.classList.remove('hidden'));
-  btnCancelRole.addEventListener('click', () => {
-    roleModal.classList.add('hidden');
-    roleForm.reset();
-  });
-
-  roleForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const newRole = {
-      id: Date.now(),
-      nombre: document.querySelector('#role-name').value,
-      permisos: []
     };
-    mockRoles.push(newRole);
-    renderRoles();
-    roleModal.classList.add('hidden');
-    roleForm.reset();
-  });
 
-  // --- Lógica Modal Permisos ---
-  const openPermissionsModal = (roleId) => {
-    currentEditingRoleId = roleId;
-    const role = mockRoles.find(r => r.id === roleId);
-    currentRoleNameSpan.textContent = role.nombre;
-    
-    // Generar checkboxes dinámicamente basados en los permisos del sistema
-    permissionsList.innerHTML = systemPermissions.map(perm => {
-      const isChecked = role.permisos.includes(perm) ? 'checked' : '';
-      return `
-        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.9rem;">
-          <input type="checkbox" value="${perm}" ${isChecked}>
-          ${perm}
-        </label>
-      `;
-    }).join('');
+    const attachTableEvents = () => {
+        // Gestionar permisos
+        document.querySelectorAll('.btn-manage-perms').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                openPermissionsModal(
+                    Number(e.target.dataset.id),
+                    e.target.dataset.name
+                );
+            });
+        });
 
-    permissionsModal.classList.remove('hidden');
-  };
+        // Eliminar rol
+        document.querySelectorAll('.btn-delete-role').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const confirmed = await showConfirm('¿Eliminar este rol? Se quitará de todos los usuarios que lo tengan.');
+                if (!confirmed) return;
+                try {
+                    const res = await fetch(`${API_URL}/api/roles/${e.target.dataset.id}`, {
+                        method: 'DELETE',
+                        headers: getHeaders()
+                    });
+                    if (!res.ok) throw new Error();
+                    showToast('Rol eliminado correctamente.', 'success');
+                    await loadRoles();
+                } catch {
+                    showToast('Error al eliminar el rol.', 'error');
+                }
+            });
+        });
+    };
 
-  btnCancelPermissions.addEventListener('click', () => {
-    permissionsModal.classList.add('hidden');
-    currentEditingRoleId = null;
-  });
+    // Modal crear rol
+    btnCreateRole.addEventListener('click', () => roleModal.classList.remove('hidden'));
+    btnCancelRole.addEventListener('click', () => {
+        roleModal.classList.add('hidden');
+        roleForm.reset();
+    });
 
-  permissionsForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    if (currentEditingRoleId) {
-      const roleIndex = mockRoles.findIndex(r => r.id === currentEditingRoleId);
-      // Recolectar todos los checkboxes seleccionados
-      const selectedCheckboxes = permissionsList.querySelectorAll('input[type="checkbox"]:checked');
-      const newPermissions = Array.from(selectedCheckboxes).map(cb => cb.value);
-      
-      // Actualizar el rol y recargar
-      mockRoles[roleIndex].permisos = newPermissions;
-      renderRoles();
-      permissionsModal.classList.add('hidden');
-    }
-  });
+    roleForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const payload = {
+            name:        document.querySelector('#role-name').value.trim(),
+            description: document.querySelector('#role-description').value.trim(),
+        };
+
+        const btnSubmit = roleForm.querySelector('button[type="submit"]');
+        btnSubmit.disabled    = true;
+        btnSubmit.textContent = 'Guardando...';
+
+        try {
+            const res  = await fetch(`${API_URL}/api/roles`, {
+                method:  'POST',
+                headers: getHeaders(),
+                body:    JSON.stringify(payload),
+            });
+            const json = await res.json();
+            if (!res.ok) {
+                showToast(json.message ?? 'Error al crear el rol.', 'error');
+                return;
+            }
+            showToast('Rol creado exitosamente.', 'success');
+            roleModal.classList.add('hidden');
+            roleForm.reset();
+            await loadRoles();
+        } catch {
+            showToast('Error de conexión al crear el rol.', 'error');
+        } finally {
+            btnSubmit.disabled    = false;
+            btnSubmit.textContent = 'Guardar Rol';
+        }
+    });
+
+    // Modal permisos
+    const openPermissionsModal = async (roleId, roleName) => {
+        currentEditingRoleId      = roleId;
+        currentRoleNameSpan.textContent = roleName;
+        permissionsList.innerHTML = 'Cargando permisos...';
+        permissionsModal.classList.remove('hidden');
+
+        try {
+            const [allRes, roleRes] = await Promise.all([
+                fetch(`${API_URL}/api/permissions`,         { headers: getHeaders() }),
+                fetch(`${API_URL}/api/roles/${roleId}/permissions`, { headers: getHeaders() }),
+            ]);
+
+            const allJson  = await allRes.json();
+            const roleJson = await roleRes.json();
+
+            const allPerms      = allJson.data  ?? [];
+            const assignedIds   = new Set((roleJson.data ?? []).map(p => p.id));
+
+            permissionsList.innerHTML = allPerms.map(perm => `
+                <label>
+                    <input
+                        type="checkbox"
+                        class="perm-checkbox"
+                        value="${perm.id}"
+                        ${assignedIds.has(perm.id) ? 'checked' : ''}
+                    >
+                    <span class="checkbox-label-text">
+                        <strong>${perm.name}</strong>
+                        <span>(${perm.code})</span>
+                    </span>
+                </label>
+            `).join('');
+        } catch {
+            permissionsList.innerHTML = '<span style="color:red; padding:0.5rem;">Error al cargar permisos.</span>';
+        }
+    };
+
+    btnCancelPermissions.addEventListener('click', () => {
+        permissionsModal.classList.add('hidden');
+        currentEditingRoleId = null;
+    });
+
+    permissionsForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!currentEditingRoleId) return;
+
+        const permissionIds = Array.from(
+            document.querySelectorAll('.perm-checkbox:checked')
+        ).map(cb => Number(cb.value));
+
+        const btnSubmit = permissionsForm.querySelector('button[type="submit"]');
+        btnSubmit.disabled    = true;
+        btnSubmit.textContent = 'Guardando...';
+
+        try {
+            const res = await fetch(`${API_URL}/api/roles/${currentEditingRoleId}/permissions`, {
+                method:  'POST',
+                headers: getHeaders(),
+                body:    JSON.stringify({ permissionIds }),
+            });
+            if (!res.ok) throw new Error();
+            showToast('Permisos actualizados exitosamente.', 'success');
+            permissionsModal.classList.add('hidden');
+            currentEditingRoleId = null;
+        } catch {
+            showToast('Error al guardar los permisos.', 'error');
+        } finally {
+            btnSubmit.disabled    = false;
+            btnSubmit.textContent = 'Guardar Permisos';
+        }
+    });
+
+    await loadRoles();
 };
