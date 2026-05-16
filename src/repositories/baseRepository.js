@@ -17,12 +17,14 @@ export const createRepository = (resource) => {
     getAll: async () => {
       const response = await fetch(endpoint, { headers: getHeaders() });
       if (!response.ok) throw new Error(`Error en GET: ${response.status}`);
-      return await response.json();
+      const json = await response.json();
+      return json.data;
     },
     getById: async (id) => {
-      const response = await fetch(`${endpoint}/${id}`, { headers: getHeaders() });
-      if (!response.ok) throw new Error(`Error en GET by ID: ${response.status}`);
-      return await response.json();
+    const response = await fetch(`${endpoint}/${id}`, { headers: getHeaders() });
+    if (!response.ok) throw new Error(`Error en GET by ID: ${response.status}`);
+    const json = await response.json();
+    return Array.isArray(json.data) ? json.data[0] : json.data;
     },
     create: async (data) => {
       const response = await fetch(endpoint, {
@@ -31,7 +33,8 @@ export const createRepository = (resource) => {
         body: JSON.stringify(data)
       });
       if (!response.ok) throw new Error(`Error en POST: ${response.status}`);
-      return await response.json();
+      const json = await response.json();
+      return json.data;
     },
     update: async (id, data) => {
       const response = await fetch(`${endpoint}/${id}`, {
@@ -40,7 +43,8 @@ export const createRepository = (resource) => {
         body: JSON.stringify(data)
       });
       if (!response.ok) throw new Error(`Error en PUT: ${response.status}`);
-      return await response.json();
+      const json = await response.json();
+      return json.data;
     },
     delete: async (id) => {
       const response = await fetch(`${endpoint}/${id}`, {
@@ -48,7 +52,8 @@ export const createRepository = (resource) => {
         headers: getHeaders()
       });
       if (!response.ok) throw new Error(`Error en DELETE: ${response.status}`);
-      return await response.json();
+      const json = await response.json();
+      return json.data;
     }
   };
 };

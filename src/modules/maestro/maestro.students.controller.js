@@ -1,94 +1,137 @@
 import { MaestroStudentsView } from './maestro.students.js';
+import { TaskRepository }       from '../../repositories/taskRepository.js';
 
-export const initMaestroStudentsModule = (container) => {
-  container.innerHTML = MaestroStudentsView;
+const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
 
-  const tableBody = document.querySelector('#maestro-students-table-body');
-  const gradeModal = document.querySelector('#grade-modal');
-  const gradeForm = document.querySelector('#grade-form');
-  const btnCancelGrade = document.querySelector('#btn-cancel-grade');
-  
-  const studentNameSpan = document.querySelector('#grade-student-name');
-  const taskTitleSpan = document.querySelector('#grade-task-title');
-  const gradeValueInput = document.querySelector('#grade-value');
+const getHeaders = () => ({
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${sessionStorage.getItem('accessToken')}`
+});
 
-  // Datos simulados de entregas de estudiantes
-  const mockSubmissions = [
-    { id: 1, doc: '987654', nombre: 'Carlos López', tarea: 'Ensayo sobre la Web', estado: 'Enviado', calificacion: null },
-    { id: 2, doc: '112233', nombre: 'Ana Martínez', tarea: 'Ejercicios CSS', estado: 'Enviado', calificacion: 85 },
-    { id: 3, doc: '445566', nombre: 'Luis Pérez', tarea: 'Ensayo sobre la Web', estado: 'Pendiente', calificacion: null }
-  ];
+export const initMaestroStudentsModule = async (container) => {
+    container.innerHTML = MaestroStudentsView;
 
-  let currentGradingId = null;
+    const tableBody        = document.querySelector('#maestro-students-table-body');
+    const gradeModal       = document.querySelector('#grade-modal');
+    const gradeForm        = document.querySelector('#grade-form');
+    const btnCancelGrade   = document.querySelector('#btn-cancel-grade');
+    const studentNameSpan  = document.querySelector('#grade-student-name');
+    const taskTitleSpan    = document.querySelector('#grade-task-title');
+    const gradeValueInput  = document.querySelector('#grade-value');
 
-  // Renderizar la tabla de entregas
-  const renderSubmissions = () => {
-    tableBody.innerHTML = '';
-    mockSubmissions.forEach(sub => {
-      const tr = document.createElement('tr');
-      
-      // Estilos para el estado
-      let estadoBadge = '';
-      if (sub.estado === 'Enviado') estadoBadge = '<span class="badge badge-maestro">Enviado</span>';
-      else estadoBadge = '<span class="badge badge-estudiante" style="background:#f8d7da; color:#721c24;">Pendiente</span>';
+    let currentTaskId = null;
 
-      // Mostrar calificación
-      const notaHtml = sub.calificacion !== null ? `<strong>${sub.calificacion} / 100</strong>` : '<span style="color:#999; font-size: 0.9rem;">Sin calificar</span>';
-      
-      // Deshabilitar botón si no ha enviado
-      const btnDisabled = sub.estado === 'Pendiente' ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : '';
+    // Renderizar tabla de entregas 
+    const loadSubmissions = async () => {
+        tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Cargando entregas...</td></tr>';
+        try {
+            // Traemos todas las tareas; cada una tiene user_name, submission_url y grade
+            const tasks = await TaskRepository.getAll();
 
-      tr.innerHTML = `
-        <td>${sub.doc}</td>
-        <td>${sub.nombre}</td>
-        <td>${sub.tarea}</td>
-        <td>${estadoBadge}</td>
-        <td>${notaHtml}</td>
-        <td>
-          <button class="btn-action edit btn-grade" data-id="${sub.id}" ${btnDisabled}>
-            ${sub.calificacion !== null ? 'Modificar Nota' : 'Calificar'}
-          </button>
-        </td>
-      `;
-      tableBody.appendChild(tr);
+            if (!tasks || tasks.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">No hay tareas registradas.</td></tr>';
+                return;
+            }
+
+            tableBody.innerHTML = '';
+            tasks.forEach(task => {
+                const tr = document.createElement('tr');
+
+                const hasSent    = task.submission_url != null;
+                const estadoBadge = hasSent
+                    ? '<span class="badge badge-maestro">Enviado</span>'
+                    : '<span class="badge badge-estudiante" style="background:#f8d7da; color:#721c24;">Pendiente</span>';
+
+                const notaHtml = task.grade != null
+                    ? `<strong>${task.grade} / 100</strong>`
+                    : '<span style="color:#999; font-size:0.9rem;">Sin calificar</span>';
+
+                // Solo puede calificar si el estudiante ya envió
+                const btnDisabled = !hasSent ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : '';
+                const btnText     = task.grade != null ? 'Modificar Nota' : 'Calificar';
+
+                tr.innerHTML = `
+                    <td>${task.user_document ?? '—'}</td>
+                    <td>${task.user_name ?? '—'}</td>
+                    <td><strong>${task.title}</strong></td>
+                    <td>${estadoBadge}</td>
+                    <td>${notaHtml}</td>
+                    <td>
+                        <button
+                            class="btn-action edit btn-grade"
+                            data-id="${task.id}"
+                            data-student="${task.user_name ?? ''}"
+                            data-title="${task.title}"
+                            data-grade="${task.grade ?? ''}"
+                            ${btnDisabled}
+                        >${btnText}</button>
+                    </td>
+                `;
+                tableBody.appendChild(tr);
+            });
+
+            document.querySelectorAll('.btn-grade').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const t = e.currentTarget;
+                    openGradeModal(
+                        Number(t.dataset.id),
+                        t.dataset.student,
+                        t.dataset.title,
+                        t.dataset.grade
+                    );
+                });
+            });
+        } catch (error) {
+            console.error('Error al cargar entregas:', error);
+            tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:red;">Error al conectar con el servidor.</td></tr>';
+        }
+    };
+
+    //  Modal de calificación 
+    const openGradeModal = (taskId, studentName, taskTitle, currentGrade) => {
+        currentTaskId              = taskId;
+        studentNameSpan.textContent = studentName;
+        taskTitleSpan.textContent   = taskTitle;
+        gradeValueInput.value       = currentGrade ?? '';
+        gradeModal.classList.remove('hidden');
+    };
+
+    btnCancelGrade.addEventListener('click', () => {
+        gradeModal.classList.add('hidden');
+        gradeForm.reset();
+        currentTaskId = null;
     });
 
-    // Eventos de los botones de calificación
-    document.querySelectorAll('.btn-grade').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const id = Number(e.target.dataset.id);
-        openGradeModal(id);
-      });
+    gradeForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!currentTaskId) return;
+
+        const grade     = Number(gradeValueInput.value);
+        const btnSubmit = gradeForm.querySelector('button[type="submit"]');
+        btnSubmit.disabled    = true;
+        btnSubmit.textContent = 'Guardando...';
+
+        try {
+            // PATCH /api/tasks/:id — solo enviamos el campo grade
+            const res = await fetch(`${API_URL}/api/tasks/${currentTaskId}`, {
+                method:  'PATCH',
+                headers: getHeaders(),
+                body:    JSON.stringify({ grade }),
+            });
+            if (!res.ok) throw new Error();
+
+            alert('Calificación guardada exitosamente.');
+            gradeModal.classList.add('hidden');
+            gradeForm.reset();
+            currentTaskId = null;
+            await loadSubmissions();
+        } catch {
+            alert('Error al guardar la calificación.');
+        } finally {
+            btnSubmit.disabled    = false;
+            btnSubmit.textContent = 'Guardar Nota';
+        }
     });
-  };
 
-  renderSubmissions();
-
-  // --- Lógica del Modal de Calificación ---
-  const openGradeModal = (id) => {
-    currentGradingId = id;
-    const sub = mockSubmissions.find(s => s.id === id);
-    studentNameSpan.textContent = sub.nombre;
-    taskTitleSpan.textContent = sub.tarea;
-    gradeValueInput.value = sub.calificacion || '';
-    gradeModal.classList.remove('hidden');
-  };
-
-  btnCancelGrade.addEventListener('click', () => {
-    gradeModal.classList.add('hidden');
-    gradeForm.reset();
-    currentGradingId = null;
-  });
-
-  gradeForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    if (currentGradingId) {
-      const index = mockSubmissions.findIndex(s => s.id === currentGradingId);
-      mockSubmissions[index].calificacion = Number(gradeValueInput.value);
-      renderSubmissions();
-      gradeModal.classList.add('hidden');
-      gradeForm.reset();
-      currentGradingId = null;
-    }
-  });
+    await loadSubmissions();
 };

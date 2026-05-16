@@ -26,6 +26,3 @@ window.addEventListener('hashchange', router);
 
 // Ejecutar el router al cargar la página por primera vez
 window.addEventListener('DOMContentLoaded', router);
-
-// --- Inicialización ---
-navigateToLogin(); 

@@ -1,5 +1,6 @@
 import { LoginView } from './login.view.js';
-import { navigateTo } from '../../routes/router.js'; 
+import { navigateTo } from '../../routes/router.js';
+import { showToast } from '../../utils/toast.js';
 
 export const initLogin = (container) => {
     container.innerHTML = LoginView;
@@ -21,46 +22,33 @@ export const initLogin = (container) => {
     loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
 
-        // 1. Obtener los datos del formulario
         const userDocument = loginForm.querySelector('#documento').value.trim();
         const password     = loginForm.querySelector('#password').value.trim();
 
         const btnSubmit = loginForm.querySelector('button[type="submit"]');
-        btnSubmit.disabled = true;
+        btnSubmit.disabled    = true;
         btnSubmit.textContent = 'Ingresando...';
 
         try {
-            // 2. PETICIÓN AL BACKEND REAL
             const response = await fetch('http://localhost:3000/api/auth/login', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ 
-                    document: userDocument, 
-                    password: password 
-                })
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ document: userDocument, password }),
             });
 
-            // Parseamos la respuesta del backend
             const data = await response.json();
 
-            // Si el backend responde con un error (ej. 401 Unauthorized o 404 Not Found)
             if (!response.ok) {
-                console.error("Respuesta de error del backend:", data); // Esto nos dirá exactamente por qué falló
-                alert(data.message || 'Credenciales inválidas o no autorizadas');
+                showToast(data.message || 'Credenciales inválidas o no autorizadas', 'error');
                 return;
             }
 
-            // 3. Guardar tokens. 
-            // Utilizamos '?' por si el backend devuelve directamente { accessToken: "..." } en lugar de { data: { accessToken: "..." } }
-            const accessToken = data.data?.accessToken || data.accessToken;
+            const accessToken  = data.data?.accessToken  || data.accessToken;
             const refreshToken = data.data?.refreshToken || data.refreshToken;
-            const user = data.data?.user || data.user;
+            const user         = data.data?.user         || data.user;
 
             if (!accessToken) {
-                console.error("El backend no devolvió un token válido:", data);
-                alert("Error de estructura en el token del backend.");
+                showToast('Error de estructura en la respuesta del servidor.', 'error');
                 return;
             }
 
@@ -68,32 +56,38 @@ export const initLogin = (container) => {
             if (refreshToken) sessionStorage.setItem('refreshToken', refreshToken);
             sessionStorage.setItem('user', JSON.stringify(user));
 
-            // 4. Extraer roles para la redirección
-            let roles = [];
-            if (Array.isArray(user.roles)) {
-                roles = user.roles.map(r => r.name.toLowerCase());
-            } else if (user.role) {
-                roles = [user.role.toLowerCase()];
+            let rolNombre = '';
+
+            // Fuente 1: roles RBAC (primer rol encontrado)
+            if (Array.isArray(user.roles) && user.roles.length > 0) {
+                rolNombre = user.roles[0].name.toLowerCase().trim();
             }
 
-            // 5. Redirigir según el rol
-            if (roles.includes('administrador') || roles.includes('admin')) {
+            // Fuente 2: campo role legacy como fallback
+            if (!rolNombre && user.role) {
+                rolNombre = user.role.toLowerCase().trim();
+            }
+
+            // Mapa de roles a rutas (incluye variantes en español e inglés)
+            if (['administrador', 'admin'].includes(rolNombre)) {
                 navigateTo('/admin');
-            } else if (roles.includes('evaluador') || roles.includes('maestro')) {
+            } else if (['evaluador', 'maestro', 'teacher'].includes(rolNombre)) {
                 navigateTo('/maestro');
-            } else if (roles.includes('aprendiz') || roles.includes('estudiante')) {
+            } else if (['aprendiz', 'estudiante', 'student', 'user'].includes(rolNombre)) {
                 navigateTo('/estudiante');
             } else {
-                console.warn("Usuario sin rol reconocido:", user);
-                alert('No tienes un rol asignado válido para ingresar.');
+                showToast(
+                    'Tu cuenta no tiene un rol válido asignado. Contacta al administrador.',
+                    'warning',
+                    6000
+                );
             }
 
         } catch (error) {
-            // Si entra aquí, es porque el backend está apagado, la URL está mal o hay problemas de CORS
             console.error('Error crítico de conexión:', error);
-            alert('No se pudo conectar con el servidor. Verifica que tu backend real esté encendido.');
+            showToast('No se pudo conectar con el servidor. Verifica que el backend esté encendido.', 'error', 6000);
         } finally {
-            btnSubmit.disabled = false;
+            btnSubmit.disabled    = false;
             btnSubmit.textContent = 'Entrar';
         }
     });
