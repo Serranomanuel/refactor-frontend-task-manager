@@ -1,31 +1,56 @@
-import './style.css';
-import { initLogin } from './modules/home/login.controller.js';
-import { initRegister } from './modules/home/register.controller.js';
-import { initAdmin } from './modules/admin/admin.controller.js';
-import { initMaestro } from './modules/maestro/maestro.controller.js';
-import { initEstudiante } from './modules/student/estudiante.controller.js';
-import { router } from './routes/router.js';
-
-
+// src/main.js
+import './style.css'
+import { initLogin }           from './modules/home/login.controller.js';
+import { initRegister }        from './modules/home/register.controller.js';
+import { initForgotPassword }  from './modules/home/forgot-password.controller.js';
+import { initResetPassword }   from './modules/home/reset-password.controller.js';
+import { initDashboard }       from './modules/home/dashboard.controller.js';
 
 const app = document.querySelector('#app');
 
-// --- Funciones de Navegación (Rutas) ---
+// Router simple basado en hash
+const router = () => {
+  const hash = window.location.hash.slice(1) || '/login';
+  const [path, query] = hash.split('?');
+  const segments = path.split('/').filter(Boolean);
+  
+  const basePath = segments[0] ? `/${segments[0]}` : '/';
+  const subPath  = segments[1] || null;
 
-const goToAdmin = () => initAdmin(app, navigateToLogin);
-const goToMaestro = () => initMaestro(app, navigateToLogin);
-const goToEstudiante = () => initEstudiante(app, navigateToLogin);
+  app.innerHTML = '';
 
-const goToRegister = () => initRegister(app, navigateToLogin);
+  switch (basePath) {
+    case '/login':
+      initLogin(app);
+      break;
+    case '/register':
+      initRegister(app);
+      break;
+    case '/forgot-password':
+      initForgotPassword(app);
+      break;
+    case '/reset-password':
+      initResetPassword(app);
+      break;
+    case '/dashboard':
+      initDashboard(app, () => navigateTo('/login'), subPath);
+      break;
+    // Redirecciones de rutas viejas
+    case '/admin':
+    case '/maestro':
+    case '/estudiante':
+      navigateTo('/dashboard');
+      break;
+    default:
+      const token = sessionStorage.getItem('accessToken') || sessionStorage.getItem('token');
+      token ? navigateTo('/dashboard') : navigateTo('/login');
+      break;
+  }
+};
 
-// Al login le pasamos todas las rutas posibles para que decida a dónde enviar al usuario
-const navigateToLogin = () => initLogin(app, goToRegister, goToAdmin, goToMaestro, goToEstudiante);
+export const navigateTo = (path) => {
+  window.location.hash = `#${path}`;
+};
 
-// Escuchar cambios en la URL (al movernos entre páginas)
 window.addEventListener('hashchange', router);
-
-// Ejecutar el router al cargar la página por primera vez
-window.addEventListener('DOMContentLoaded', router);
-
-// --- Inicialización ---
-navigateToLogin(); 
+document.addEventListener('DOMContentLoaded', router);

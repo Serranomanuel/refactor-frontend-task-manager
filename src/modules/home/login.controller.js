@@ -1,7 +1,7 @@
 import { LoginView } from './login.view.js';
 import { navigateTo } from '../../routes/router.js';
 import { login } from '../../backend/auth.js';
-import { showNotification } from '../../utils/notifications.js';
+import { showToast, showConfirm } from '../../utils/toast.js';
 
 export const initLogin = (container) => {
     container.innerHTML = LoginView;
@@ -48,7 +48,7 @@ export const initLogin = (container) => {
             // En caso de error o credenciales invalidas
             if (!response.success) {
                 const confirm = (response.message || 'Credenciales inválidas o no autorizadas');
-                showNotification(confirm, "error");
+                showConfirm(confirm, "error");
 
                 return;
             };
@@ -63,8 +63,8 @@ export const initLogin = (container) => {
             sessionStorage.setItem('refreshToken', refreshToken);
             sessionStorage.setItem('user', JSON.stringify(user));
 
-            // Redirigir a la vista inicial
-            navigateTo('/admin');
+            // Redirigir al dashboard dinámico
+            navigateTo('/dashboard');
 
         } catch (error) {
             // Si entra aquí, es porque el backend está apagado, la URL está mal o hay problemas de CORS
